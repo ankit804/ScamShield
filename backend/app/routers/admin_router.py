@@ -144,8 +144,15 @@ def update_user_status(
         ip_address=request.client.host if request.client else None
     )
 
-    db.add(audit)
-    db.commit()
+    try:
+        db.add(audit)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user status and record audit log."
+        )
 
     return {
         "message": f"User status successfully updated to {status_in.status}.",

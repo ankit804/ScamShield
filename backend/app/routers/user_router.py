@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from ..models import User, Scan
 from ..schemas import UserResponse, ScanCreate, ScanResponse, UserStats
 from ..auth import get_current_user
 
+# Initialize router instance
 router = APIRouter(prefix="/users/me", tags=["User Dashboard"])
 
 @router.get("", response_model=UserResponse)
@@ -115,9 +117,16 @@ def create_user_scan(
         disclaimer=scan_in.disclaimer
     )
 
-    db.add(new_scan)
-    db.commit()
-    db.refresh(new_scan)
+    try:
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save scan record to database."
+        )
 
     return {
         "id": new_scan.id,
@@ -162,6 +171,14 @@ def delete_user_scan(
             detail="You do not have permission to delete this scan record."
         )
 
-    db.delete(scan)
-    db.commit()
+    try:
+        db.delete(scan)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete scan record."
+        )
+        
     return {"message": "Scan record successfully deleted."}

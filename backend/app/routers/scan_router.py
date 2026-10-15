@@ -1,11 +1,13 @@
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Scan
-from ..auth import get_optional_user
+from ..schemas import ScanCreate, ScanResponse
+from ..auth import get_optional_user, get_current_user
 
 router = APIRouter(tags=["Analysis Engine"])
 
@@ -199,7 +201,7 @@ async def analyze_submission(
         "disclaimer": "ScamShield identifies potential warning signs. This analysis cannot independently confirm whether money was received or prove that a person or transaction is fraudulent."
     }
 
-    # If user is authenticated, persist to database automatically
+    # If user is authenticated, persist to database automatically with safe rollback
     if current_user:
         new_scan = Scan(
             id=scan_id,
@@ -217,7 +219,51 @@ async def analyze_submission(
             next_steps_json=json.dumps(next_steps),
             disclaimer=result_obj["disclaimer"]
         )
-        db.add(new_scan)
-        db.commit()
+        try:
+            db.add(new_scan)
+            db.commit()
+        except Exception:
+            db.rollback()
 
     return result_obj
+
+
+scan_router_api = APIRouter(prefix="/scans", tags=["Scans"])
+
+@scan_router_api.post("", status_code=status.HTTP_201_CREATED)
+def create_scan(scan_data: ScanCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Generate a unique ID if not provided in the request payload
+    scan_id = scan_data.id if scan_data.id else f"scan-{uuid.uuid4().hex[:12]}"
+    
+    # Create the database model instance
+    new_scan = Scan(
+        id=scan_id,
+        user_id=current_user.id,
+        type=scan_data.type,
+        type_label=scan_data.type_label,
+        submitted_item=scan_data.submitted_item,
+        risk_category=scan_data.risk_category,
+        risk_label=scan_data.risk_label,
+        status=scan_data.status,
+        evidence_found=scan_data.evidence_found,
+        total_indicators=scan_data.total_indicators,
+        summary=scan_data.summary,
+        findings_json=json.dumps(scan_data.findings),
+        next_steps_json=json.dumps(scan_data.next_steps),
+        disclaimer=scan_data.disclaimer
+    )
+    
+    try:
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create scan record."
+        )
+    return new_scan
+
+# Include the second sub-router actions into the main router instance
+router.include_router(scan_router_api)
