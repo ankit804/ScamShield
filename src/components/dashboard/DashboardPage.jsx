@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import MetricCard from './MetricCard';
 import QuickScanCard from './QuickScanCard';
 import RecentActivityCard from './RecentActivityCard';
@@ -16,10 +17,38 @@ import {
 
 export default function DashboardPage() {
   const { setCurrentView, t, history } = useApp();
+  const { user, isAuthenticated, token, apiBase } = useAuth();
 
-  const flaggedCount = history.filter(h => h.riskCategory === 'high').length + 20; // illustrative demo
-  const reviewCount = history.filter(h => h.riskCategory === 'review').length + 6;
-  const totalCount = history.length + 122;
+  const [userStats, setUserStats] = useState(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    const fetchUserStats = async () => {
+      try {
+        const res = await fetch(`${apiBase}/users/me/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUserStats(data);
+        }
+      } catch (err) {
+        // Fall back to local state
+      }
+    };
+
+    fetchUserStats();
+  }, [isAuthenticated, token, apiBase]);
+
+  // If user has real DB stats, use them; otherwise use illustrative demo baseline
+  const totalCount = userStats ? userStats.total_scans : history.length + 122;
+  const flaggedCount = userStats ? userStats.high_concern_count : history.filter(h => h.riskCategory === 'high').length + 20;
+  const reviewCount = userStats ? userStats.review_count : history.filter(h => h.riskCategory === 'review').length + 6;
+
+  const greeting = user?.full_name 
+    ? `Welcome back, ${user.full_name.split(' ')[0]} 👋` 
+    : t.greeting;
 
   return (
     <div className="space-y-6">
@@ -27,7 +56,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#172033] tracking-tight font-heading">
-            {t.greeting}
+            {greeting}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             {t.heroSubtitle}
@@ -62,21 +91,21 @@ export default function DashboardPage() {
         <MetricCard
           title={t.totalScans}
           value={totalCount}
-          subtext="Illustrative demo data"
+          subtext={userStats ? "Your account scans" : "Illustrative demo data"}
           icon={CheckCircle}
           color="blue"
         />
         <MetricCard
           title={t.flaggedCases}
           value={flaggedCount}
-          subtext="Requires extreme caution"
+          subtext={userStats ? "High concern in your history" : "Requires extreme caution"}
           icon={AlertTriangle}
           color="red"
         />
         <MetricCard
           title={t.casesRequiringReview}
           value={reviewCount}
-          subtext="Unverified transfer claims"
+          subtext={userStats ? "Pending verification" : "Unverified transfer claims"}
           icon={AlertCircle}
           color="amber"
         />

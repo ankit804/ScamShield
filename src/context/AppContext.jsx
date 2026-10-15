@@ -4,12 +4,65 @@ import { translations } from '../data/translations';
 
 const AppContext = createContext();
 
-const validViews = ['overview', 'analyze', 'results', 'history', 'guide', 'settings'];
+const validViews = [
+  'overview', 
+  'analyze', 
+  'results', 
+  'history', 
+  'guide', 
+  'settings',
+  'login',
+  'register',
+  'admin',
+  'admin-users',
+  'admin-scans',
+  'admin-audit',
+  'unauthorized'
+];
+
+const pathToViewMap = {
+  '': 'overview',
+  'dashboard': 'overview',
+  'overview': 'overview',
+  'analyze': 'analyze',
+  'results': 'results',
+  'history': 'history',
+  'dashboard/scans': 'history',
+  'guide': 'guide',
+  'settings': 'settings',
+  'dashboard/settings': 'settings',
+  'login': 'login',
+  'register': 'register',
+  'admin': 'admin',
+  'admin/users': 'admin-users',
+  'admin/scans': 'admin-scans',
+  'admin/audit-logs': 'admin-audit',
+  'unauthorized': 'unauthorized'
+};
+
+const viewToPathMap = {
+  'overview': '/dashboard',
+  'analyze': '/analyze',
+  'results': '/results',
+  'history': '/dashboard/scans',
+  'guide': '/guide',
+  'settings': '/dashboard/settings',
+  'login': '/login',
+  'register': '/register',
+  'admin': '/admin',
+  'admin-users': '/admin/users',
+  'admin-scans': '/admin/scans',
+  'admin-audit': '/admin/audit-logs',
+  'unauthorized': '/unauthorized'
+};
 
 export function AppProvider({ children }) {
   const getInitialView = () => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+      if (pathToViewMap[path]) {
+        return pathToViewMap[path];
+      }
       if (validViews.includes(path)) {
         return path;
       }
@@ -18,6 +71,7 @@ export function AppProvider({ children }) {
   };
 
   const [currentView, setCurrentView] = useState(getInitialView);
+
   const [currentResult, setCurrentResult] = useState(initialHistory[0]);
   const [history, setHistory] = useState(() => {
     try {
@@ -92,7 +146,7 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
-      const targetView = validViews.includes(path) ? path : 'overview';
+      const targetView = pathToViewMap[path] || (validViews.includes(path) ? path : 'overview');
       setCurrentView(targetView);
     };
     window.addEventListener('popstate', handlePopState);
@@ -102,13 +156,14 @@ export function AppProvider({ children }) {
   const navigateTo = (view) => {
     setCurrentView(view);
     if (typeof window !== 'undefined' && window.history) {
-      const targetPath = view === 'overview' ? '/' : `/${view}`;
+      const targetPath = viewToPathMap[view] || (view === 'overview' ? '/' : `/${view}`);
       if (window.location.pathname !== targetPath) {
         window.history.pushState({ view }, '', targetPath);
       }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
 
 
   return (

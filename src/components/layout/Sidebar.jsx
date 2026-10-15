@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   LayoutDashboard, 
   ScanSearch, 
@@ -9,11 +10,14 @@ import {
   Shield, 
   HelpCircle,
   ExternalLink,
-  X
+  X,
+  ShieldAlert,
+  LogIn
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {
   const { currentView, setCurrentView, t, language } = useApp();
+  const { user, isAuthenticated, isAdmin } = useAuth();
 
   const navItems = [
     { id: 'overview', label: t.overview, icon: LayoutDashboard },
@@ -27,6 +31,10 @@ export default function Sidebar({ isOpen, onClose }) {
     setCurrentView(id);
     if (onClose) onClose();
   };
+
+  const initials = user?.full_name 
+    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() 
+    : 'AS';
 
   return (
     <>
@@ -99,6 +107,25 @@ export default function Sidebar({ isOpen, onClose }) {
                 </button>
               );
             })}
+
+            {/* Admin Portal Shortcut if user is Admin */}
+            {isAdmin && (
+              <div className="pt-2 mt-2 border-t border-[#1C3B64]">
+                <button
+                  onClick={() => handleNavClick('admin')}
+                  className={`
+                    w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-bold transition-all text-left
+                    ${currentView === 'admin'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-indigo-300 hover:bg-indigo-950/60 hover:text-white'
+                    }
+                  `}
+                >
+                  <ShieldAlert className="w-4 h-4 shrink-0 text-indigo-400" />
+                  <span>Admin Dashboard</span>
+                </button>
+              </div>
+            )}
           </nav>
         </div>
 
@@ -115,18 +142,38 @@ export default function Sidebar({ isOpen, onClose }) {
             </p>
           </div>
 
-          {/* User Profile */}
-          <div className="flex items-center gap-3 pt-1">
-            <div className="w-9 h-9 rounded-full bg-linear-to-tr from-blue-700 to-indigo-500 border-2 border-white/20 flex items-center justify-center text-white font-semibold text-xs shadow-inner">
-              AS
+          {/* User Profile or Sign In prompt */}
+          {isAuthenticated ? (
+            <div 
+              onClick={() => handleNavClick('settings')}
+              className="flex items-center gap-3 pt-1 cursor-pointer hover:opacity-90 transition-opacity"
+            >
+              <div className={`w-9 h-9 rounded-full border-2 border-white/20 flex items-center justify-center text-white font-semibold text-xs shadow-inner ${
+                isAdmin ? 'bg-indigo-600' : 'bg-blue-600'
+              }`}>
+                {initials}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-white truncate">
+                  {user?.full_name || 'Ankit Sharma'}
+                </span>
+                <span className="text-[11px] text-slate-400 truncate">
+                  {isAdmin ? 'Security Admin' : t.userRole}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-white truncate">Ankit Sharma</span>
-              <span className="text-[11px] text-slate-400 truncate">{t.userRole}</span>
-            </div>
-          </div>
+          ) : (
+            <button
+              onClick={() => handleNavClick('login')}
+              className="w-full py-2 px-3 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-blue-500/30"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Merchant Sign In</span>
+            </button>
+          )}
         </div>
       </aside>
     </>
   );
 }
+
