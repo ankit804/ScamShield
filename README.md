@@ -2,12 +2,15 @@
 
 A production-quality FinTech web application designed for Nepali online sellers, small merchants, and digital payment users. Inspired by modern financial dashboards (Stripe, Linear, Wise), ScamShield Nepal helps users detect warning signs in suspicious payment screenshots, fraudulent messages, and phishing URLs before dispatching goods.
 
-![ScamShield Nepal](https://img.shields.io/badge/Status-Hackathon%20Ready-2563EB)
+![ScamShield Nepal](https://img.shields.io/badge/Status-Live%20on%20Vercel-2563EB)
 ![React](https://img.shields.io/badge/React-19-blue)
 ![Vite](https://img.shields.io/badge/Vite-5.4-purple)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-teal)
 
+🔗 **Live Production URL**: [https://scamshield-nepal.vercel.app](https://scamshield-nepal.vercel.app)
+
 ---
+
 
 ## 🌟 Key Features
 
