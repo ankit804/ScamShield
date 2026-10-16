@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -19,6 +19,17 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(true);
+
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    try {
+      localStorage.removeItem('scamshield_token');
+      localStorage.removeItem('scamshield_user');
+      sessionStorage.removeItem('scamshield_token');
+      sessionStorage.removeItem('scamshield_user');
+    } catch { /* storage may be unavailable in restricted browser contexts */ }
+  }, []);
 
   // Validate session against backend on mount
   useEffect(() => {
@@ -50,7 +61,7 @@ export function AuthProvider({ children }) {
     };
 
     verifySession();
-  }, [token]);
+  }, [token, logout]);
 
   const login = async (email, password, rememberMe = false) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -100,15 +111,6 @@ export function AuthProvider({ children }) {
     }
 
     return data;
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('scamshield_token');
-    localStorage.removeItem('scamshield_user');
-    sessionStorage.removeItem('scamshield_token');
-    sessionStorage.removeItem('scamshield_user');
   };
 
   const requestPasswordReset = async (email) => {

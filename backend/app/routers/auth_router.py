@@ -19,7 +19,7 @@ from ..auth import (
     create_access_token, 
     get_current_user
 )
-from ..config import settings
+from ..config import settings, should_disclose_reset_token
 
 # Initialize router instance
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -142,10 +142,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
     user = db.query(User).filter(User.email == req.email.lower().strip()).first()
     if not user:
-        return {
-            "message": "If an account with that email exists, password reset instructions have been prepared.",
-            "reset_token": None
-        }
+        return {"message": "If an account with that email exists, password reset instructions have been prepared."}
 
     reset_token = secrets.token_urlsafe(32)
     user.reset_token = reset_token
@@ -160,12 +157,13 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             detail="Failed to generate password reset token."
         )
 
-    return {
-        "message": "Password reset token generated successfully.",
-        "reset_token": reset_token,
-        "expires_in_minutes": 15,
-        "note": "SMTP email delivery is not configured in this environment; the reset token is provided above for verification."
-    }
+    response = {"message": "If an account with that email exists, password reset instructions have been prepared."}
+    # Local demos have no configured mailer. Never return a live reset token in production.
+    if should_disclose_reset_token(settings.ENVIRONMENT):
+        response["reset_token"] = reset_token
+        response["expires_in_minutes"] = 15
+        response["note"] = "Development only: SMTP delivery is not configured, so this token is shown for local verification."
+    return response
 
 
 @router.post("/reset-password")
@@ -180,7 +178,7 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired password reset token."
         )
 
-    if user.reset_token_expires_at and user.reset_token_expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+    if not user.reset_token_expires_at or user.reset_token_expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password reset token has expired. Please request a new one."

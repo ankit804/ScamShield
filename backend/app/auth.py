@@ -106,13 +106,18 @@ def get_optional_user(
     """Optionally fetch user if authenticated token is provided"""
     if not credentials:
         return None
+    payload = decode_token(credentials.credentials)
     try:
-        payload = decode_token(credentials.credentials)
-        user_id = payload.get("sub")
-        if user_id:
-            user = db.query(User).filter(User.id == int(user_id)).first()
-            if user and user.status == "active":
-                return user
-    except Exception:
-        pass
-    return None
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account no longer exists.")
+    if user.status == "suspended":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your account has been suspended.")
+    return user

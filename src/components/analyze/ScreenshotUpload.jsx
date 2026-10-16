@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import ReceiptPreviewCard from './ReceiptPreviewCard';
 import { sampleScenarios } from '../../data/sampleScenarios';
@@ -12,10 +12,18 @@ export default function ScreenshotUpload({
   const { t } = useApp();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [previewData, setPreviewData] = useState(sampleScenarios.screenshots[0].previewData);
+  const [previewData, setPreviewData] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
-  const [fileName, setFileName] = useState("esewa-payment-receipt.png");
-  const [presetType, setPresetType] = useState("high-fraud");
+  const [fileName, setFileName] = useState("");
+  const [presetType, setPresetType] = useState("");
+
+  useEffect(() => {
+    if (!activeData?.fileName) return;
+    setFileName(activeData.fileName);
+    setPresetType(activeData.presetType || 'custom-upload');
+    setPreviewData(activeData.previewData || null);
+    setUploadedImage(activeData.fileData || null);
+  }, [activeData]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -28,12 +36,17 @@ export default function ScreenshotUpload({
 
   const processFile = (file) => {
     if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      alert("Please choose a PNG or JPEG image.");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       alert("File size exceeds 5MB limit. Please upload a smaller screenshot.");
       return;
     }
     const reader = new FileReader();
     reader.onload = (e) => {
+      if (typeof e.target.result !== 'string') return;
       setUploadedImage(e.target.result);
       setFileName(file.name);
       setPresetType("custom-upload");
@@ -73,6 +86,8 @@ export default function ScreenshotUpload({
   const handleRemove = () => {
     setUploadedImage(null);
     setFileName("");
+    setPreviewData(null);
+    setPresetType("");
     onClear();
   };
 

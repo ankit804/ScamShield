@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import ScreenshotUpload from './ScreenshotUpload';
 import MessageInput from './MessageInput';
 import UrlInput from './UrlInput';
@@ -9,6 +10,7 @@ import { Image, MessageSquare, Link as LinkIcon, ArrowRight, Loader2, AlertCircl
 
 export default function AnalyzePage() {
   const { t, language, setLanguage, addScanResult, showToast } = useApp();
+  const { token } = useAuth();
 
   const [activeTab, setActiveTab] = useState(() => {
     const preferred = sessionStorage.getItem('preferred_tab');
@@ -19,14 +21,9 @@ export default function AnalyzePage() {
     return 'screenshot';
   });
 
-  const [screenshotData, setScreenshotData] = useState({
-    fileName: 'esewa-fake-payment.png',
-    fileSize: 450000,
-    presetType: 'high-fraud',
-    caption: 'Payment Successful NPR 2,500.00 Ref: 12356598'
-  });
-  const [messageText, setMessageText] = useState('Dispatch immediately or I will cancel the order! Payment sent via eSewa 9841234567, check and confirm.');
-  const [urlValue, setUrlValue] = useState('https://bit.ly/esewa-urgent-kyc-verify');
+  const [screenshotData, setScreenshotData] = useState({ fileName: '', fileSize: 0 });
+  const [messageText, setMessageText] = useState('');
+  const [urlValue, setUrlValue] = useState('');
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
@@ -68,28 +65,32 @@ export default function AnalyzePage() {
         setValidationError('Please enter a URL to check.');
         return;
       }
+      try {
+        const parsed = new URL(urlValue.includes('://') ? urlValue : `https://${urlValue}`);
+        if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error('invalid URL');
+      } catch {
+        setValidationError('Enter a valid web address using HTTP or HTTPS.');
+        return;
+      }
       payload = { type: 'url', data: { url: urlValue } };
     }
 
     setIsAnalyzing(true);
     setAnalysisStep(1);
-
-    setTimeout(() => { setAnalysisStep(2); }, 700);
-    setTimeout(() => { setAnalysisStep(3); }, 1400);
-
-    setTimeout(async () => {
-      try {
-        const result = await analyzeSubmission({ type: payload.type, data: payload.data, language });
-        setIsAnalyzing(false);
-        setAnalysisStep(0);
-        addScanResult(result);
-        showToast(language === 'ne' ? 'विश्लेषण सम्पन्न भयो' : 'Risk analysis completed successfully', 'success');
-      } catch {
-        setIsAnalyzing(false);
-        setAnalysisStep(0);
-        setValidationError('Analysis encountered an issue. Please try again.');
-      }
-    }, 2100);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 350));
+      setAnalysisStep(2);
+      await new Promise(resolve => setTimeout(resolve, 350));
+      setAnalysisStep(3);
+      const result = await analyzeSubmission({ type: payload.type, data: payload.data, language, token });
+      addScanResult(result);
+      showToast(language === 'ne' ? 'विश्लेषण सम्पन्न भयो' : 'Risk analysis completed successfully', 'success');
+    } catch (error) {
+      setValidationError(error.message || 'Analysis encountered an issue. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisStep(0);
+    }
   };
 
   return (

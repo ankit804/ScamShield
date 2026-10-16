@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any
+from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -50,7 +51,18 @@ async def analyze_submission(
 
     if scan_type == "screenshot":
         preset_type = data.get("presetType")
-        if preset_type == "high-fraud" or detected_urgency or detected_alternate:
+        if preset_type == "custom-upload":
+            risk_category = "review"
+            evidence_count = 0
+            findings.append({
+                "id": "f-scr-review",
+                "title": "Image content was not inspected",
+                "severity": "medium",
+                "evidence": data.get("fileName", ""),
+                "explanation": "This service does not perform OCR or image manipulation detection, so it cannot assess the payment details shown.",
+                "recommended": "Check the transaction directly in your own bank or wallet ledger before acting."
+            })
+        elif preset_type == "high-fraud" or detected_urgency or detected_alternate:
             risk_category = "high"
             evidence_count = 4
             findings.append({
@@ -143,20 +155,46 @@ async def analyze_submission(
             risk_category = "safe"
             evidence_count = 0
     elif scan_type == "url":
+        candidate = raw_text if "://" in raw_text else f"https://{raw_text}"
+        try:
+            hostname = (urlsplit(candidate).hostname or "").lower().rstrip(".")
+        except ValueError:
+            hostname = ""
+        official_domains = ("esewa.com.np", "khalti.com", "connectips.com", "fonepay.com")
+        is_official_domain = any(hostname == domain or hostname.endswith(f".{domain}") for domain in official_domains)
         if detected_url_shortener or detected_suspicious_domain:
             risk_category = "high"
             evidence_count = 3
             findings.append({
                 "id": "f-url-1",
-                "title": "Concealed or untrusted destination",
+                "title": "Concealed or suspicious URL pattern",
                 "severity": "high",
                 "evidence": f'"{raw_text}"',
-                "explanation": "Target domain does not match official Nepali financial service providers.",
-                "recommended": "Do not visit the website. Never enter credentials."
+                "explanation": "The URL uses a shortening service or a suspicious domain/credential prompt pattern. The destination has not been opened or scanned.",
+                "recommended": "Do not follow the link or enter credentials. Open the provider's official app independently."
             })
-        else:
+        elif is_official_domain:
             risk_category = "safe"
             evidence_count = 0
+            findings.append({
+                "id": "f-url-official-host",
+                "title": "Recognized provider hostname",
+                "severity": "low",
+                "evidence": hostname,
+                "explanation": "The hostname matches a known provider domain. This check does not verify the page, connection, or current safety of the site.",
+                "recommended": "Check the hostname carefully and use the official app for payments."
+            })
+        else:
+            risk_category = "review"
+            evidence_count = 1
+            findings.append({
+                "id": "f-url-review",
+                "title": "Unverified destination",
+                "severity": "medium",
+                "evidence": f'"{raw_text}"',
+                "explanation": "This hostname is not on the small list of recognized provider domains. No live reputation lookup is performed.",
+                "recommended": "Avoid entering payment credentials unless you independently confirm the destination."
+            })
 
     risk_label = (
         "High Concern" if risk_category == "high" 
@@ -194,7 +232,7 @@ async def analyze_submission(
         "riskLabel": risk_label,
         "status": "Completed",
         "evidenceFound": evidence_count,
-        "totalIndicators": 6 if scan_type == "screenshot" else 5,
+        "totalIndicators": 6 if scan_type == "screenshot" else 5 if scan_type == "message" else 4,
         "summary": summary,
         "findings": findings,
         "nextSteps": next_steps,

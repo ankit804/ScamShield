@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { CheckCircle2, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Trash2, RefreshCw } from 'lucide-react';
 
 export default function ReceiptPreviewCard({ 
   previewData, 
@@ -19,7 +19,7 @@ export default function ReceiptPreviewCard({
             {t.preview}
           </span>
           <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">
-            {uploadedImage ? "User File" : "Sample Demo Voucher"}
+            {uploadedImage ? "User File" : previewData ? "Sample Demo Voucher" : "No image selected"}
           </span>
         </div>
 
@@ -34,7 +34,7 @@ export default function ReceiptPreviewCard({
               />
               <p className="text-[11px] font-semibold text-slate-700 truncate">{fileName}</p>
             </div>
-          ) : (
+          ) : previewData ? (
             <div className="space-y-2.5">
               {/* Brand Logo inside voucher */}
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600">
@@ -74,6 +74,8 @@ export default function ReceiptPreviewCard({
                 )}
               </div>
             </div>
+          ) : (
+            <div className="py-10 text-sm text-slate-500">Choose a screenshot or a sample scenario to preview it.</div>
           )}
         </div>
       </div>

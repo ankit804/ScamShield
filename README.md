@@ -16,9 +16,9 @@ A production-quality FinTech web application designed for Nepali online sellers,
 
 ### 1. 🛡️ Realistic Risk Analysis Engine (`/analyze` & `/results`)
 - **Three Input Modalities**:
-  - **Payment Screenshot**: Drag-and-drop dropzone, file validation, live preview card with eSewa/Khalti vouchers, image replacement, and removal.
+- **Payment Screenshot**: Drag-and-drop image selection, file validation, and preview. Custom uploads are not OCR-scanned or checked for image manipulation; results clearly ask users to verify the payment in their own ledger. Demo voucher scenarios exercise the heuristic flow.
   - **Suspicious Message**: Text input with live character counter, preloaded merchant fraud templates (urgent courier rush, overpayment scam claim, Nepali rush message).
-  - **Suspicious URL**: Safe sandboxed URL inspection with validation and explanations.
+- **Suspicious URL**: URL syntax validation and hostname-based heuristics. The application does not visit the URL or check live domain reputation, and unknown hosts require manual verification.
 - **Realistic Progressive Stepper**:
   - Step 1: Extracting text (OCR / Tokenization)
   - Step 2: Checking warning signs (Heuristic risk patterns)

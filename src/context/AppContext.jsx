@@ -72,7 +72,7 @@ export function AppProvider({ children }) {
 
   const [currentView, setCurrentView] = useState(getInitialView);
 
-  const [currentResult, setCurrentResult] = useState(initialHistory[0]);
+  const [currentResult, setCurrentResult] = useState(null);
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('scamshield_history');
@@ -129,7 +129,7 @@ export function AppProvider({ children }) {
   const addScanResult = (result) => {
     setHistory(prev => [result, ...prev]);
     setCurrentResult(result);
-    setCurrentView('results');
+    navigateTo('results');
   };
 
   const deleteScan = (id) => {

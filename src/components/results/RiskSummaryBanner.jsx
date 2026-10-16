@@ -5,8 +5,11 @@ import { AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
 export default function RiskSummaryBanner({ result }) {
   const { t } = useApp();
 
-  const isHigh = result.riskCategory === 'high';
-  const isReview = result.riskCategory === 'review';
+  const riskCategory = result.riskCategory ?? result.risk_category;
+  const evidenceFound = result.evidenceFound ?? result.evidence_found ?? 0;
+  const totalIndicators = result.totalIndicators ?? result.total_indicators ?? 0;
+  const isHigh = riskCategory === 'high';
+  const isReview = riskCategory === 'review';
 
   const config = isHigh ? {
     bg: 'bg-red-50/60 border-red-200/90 text-red-950',
@@ -53,7 +56,7 @@ export default function RiskSummaryBanner({ result }) {
         </span>
         <div className="flex items-baseline sm:justify-end gap-1.5 mt-0.5">
           <span className="text-2xl font-extrabold font-heading">
-            {result.evidenceFound} / {result.totalIndicators}
+            {evidenceFound} / {totalIndicators}
           </span>
           <span className="text-xs font-semibold opacity-75">
             {t.indicators}

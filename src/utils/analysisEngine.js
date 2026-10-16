@@ -3,25 +3,46 @@
  * Modular logic separated from UI to allow drop-in FastAPI backend integration.
  */
 
-export async function analyzeSubmission({ type, data, language = "en" }) {
+function normalizeAnalysisResult(result) {
+  return {
+    ...result,
+    typeLabel: result.typeLabel ?? result.type_label,
+    submittedItem: result.submittedItem ?? result.submitted_item,
+    riskCategory: result.riskCategory ?? result.risk_category,
+    riskLabel: result.riskLabel ?? result.risk_label,
+    evidenceFound: result.evidenceFound ?? result.evidence_found ?? 0,
+    totalIndicators: result.totalIndicators ?? result.total_indicators ?? 0,
+    nextSteps: result.nextSteps ?? result.next_steps ?? [],
+    dateFormatted: result.dateFormatted ?? (result.timestamp ? new Date(result.timestamp).toLocaleString() : ''),
+    findings: Array.isArray(result.findings) ? result.findings : []
+  };
+}
+
+export async function analyzeSubmission({ type, data, language = "en", token = null }) {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-  // If a live FastAPI backend is configured, attempt remote API call
+  // The current API accepts text metadata only. Never send raw image data in JSON.
   if (apiBaseUrl && apiBaseUrl.trim()) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const safeData = { ...data };
+      delete safeData.fileData;
       const res = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, data, language }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ type, data: safeData, language }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
       if (res.ok) {
         const result = await res.json();
-        return result;
+        return normalizeAnalysisResult(result);
       }
+      console.warn(`Analysis API returned ${res.status}; using the local heuristic engine.`);
     } catch (err) {
       console.warn("Backend API not reachable, falling back to built-in client engine:", err);
     }
@@ -43,8 +64,24 @@ export async function analyzeSubmission({ type, data, language = "en" }) {
   const detectedPhone = /(?:\+?977[- ]?)?9[78]\d{8}/.test(text);
   const detectedUrlShortener = /bit\.ly|tinyurl|is\.gd|t\.co|cutt\.ly|rb\.gy/i.test(text);
   const detectedSuspiciousDomain = /\.top|\.xyz|\.club|\.online|\.site|\.tk|\.info|secure|login|verify|kyc|bonus|prize/i.test(text);
+  let urlHostname = '';
+  if (type === 'url') {
+    try { urlHostname = new URL(rawText.includes('://') ? rawText : `https://${rawText}`).hostname.toLowerCase(); } catch { /* treated as unverified below */ }
+  }
 
   if (type === "screenshot") {
+    if (data.presetType === 'custom-upload') {
+      riskCategory = 'review';
+      evidenceCount = 0;
+      findings.push({
+        id: 'f-scr-review',
+        title: language === 'ne' ? 'स्क्रिनसटको दृश्य जाँच उपलब्ध छैन' : 'Image content was not inspected',
+        severity: 'medium',
+        evidence: data.fileName || '',
+        explanation: language === 'ne' ? 'यो संस्करणले छविबाट कारोबार विवरण निकाल्न वा सम्पादन पत्ता लगाउन सक्दैन।' : 'This version does not perform OCR or image manipulation detection, so it cannot assess the payment details shown.',
+        recommended: language === 'ne' ? 'आफ्नो बैंक वा वालेट एपमा कारोबार आफैँ पुष्टि गर्नुहोस्।' : 'Check the transaction directly in your own bank or wallet ledger before acting.'
+      });
+    } else {
     // Screenshot analysis
     const hasPresetTag = data.presetType;
 
@@ -142,6 +179,7 @@ export async function analyzeSubmission({ type, data, language = "en" }) {
           : "Always verify the deposit in your native banking or wallet application."
       });
     }
+    }
   } else if (type === "message") {
     // Message text analysis
     if (detectedUrgency || detectedAlternate || text.includes("cancel") || (detectedPhone && text.includes("refund"))) {
@@ -233,7 +271,8 @@ export async function analyzeSubmission({ type, data, language = "en" }) {
   } else if (type === "url") {
     // URL analysis
     if (detectedUrlShortener || detectedSuspiciousDomain || text.includes("esewa") || text.includes("khalti")) {
-      const isOfficialDomain = /esewa\.com\.np|khalti\.com|connectips\.com|fonepay\.com/i.test(text);
+      const officialDomains = ['esewa.com.np', 'khalti.com', 'connectips.com', 'fonepay.com'];
+      const isOfficialDomain = officialDomains.some(domain => urlHostname === domain || urlHostname.endsWith(`.${domain}`));
       if (!isOfficialDomain) {
         riskCategory = "high";
         evidenceCount = 3;
