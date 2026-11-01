@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient';
+
 /**
  * Heuristic Scam Analysis Engine for ScamShield Nepal
  * Modular logic separated from UI to allow drop-in FastAPI backend integration.
@@ -19,33 +21,44 @@ function normalizeAnalysisResult(result) {
 }
 
 export async function analyzeSubmission({ type, data, language = "en", token = null }) {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  const apiBaseUrl = import.meta.env.VITE_DEMO_MODE === 'true'
+    ? ''
+    : (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
-  // The current API accepts text metadata only. Never send raw image data in JSON.
+  // Send screenshot bytes only after the user explicitly submits a screenshot analysis.
   if (apiBaseUrl && apiBaseUrl.trim()) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       const safeData = { ...data };
-      delete safeData.fileData;
-      const res = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/analyze`, {
+      delete safeData.previewData;
+      if (type !== 'screenshot') delete safeData.fileData;
+      const res = await apiFetch('/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ type, data: safeData, language }),
-        signal: controller.signal
+        signal: controller.signal,
+        token
       });
       clearTimeout(timeoutId);
       if (res.ok) {
         const result = await res.json();
         return normalizeAnalysisResult(result);
       }
-      console.warn(`Analysis API returned ${res.status}; using the local heuristic engine.`);
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `Analysis service returned ${res.status}.`);
     } catch (err) {
-      console.warn("Backend API not reachable, falling back to built-in client engine:", err);
+      throw new Error(err.name === 'AbortError'
+        ? 'The analysis service took too long. Please retry.'
+        : err.message || 'The analysis service is unavailable. Please try again later.');
     }
+  }
+
+  if (import.meta.env.PROD && import.meta.env.VITE_DEMO_MODE !== 'true') {
+    throw new Error('Analysis is not configured. Set VITE_API_BASE_URL to the backend URL or explicitly enable demo mode.');
   }
 
   // Simulate processing time for realistic analysis steps
@@ -385,6 +398,7 @@ export async function analyzeSubmission({ type, data, language = "en", token = n
     : (language === "ne" ? "कुनै मुख्य चेतावनी फेला परेन" : "No Major Warning Signs Detected");
 
   return {
+    analysisMode: 'demo',
     id: `scan-${Date.now()}`,
     type,
     typeLabel: type === "screenshot" ? "Payment Screenshot" : type === "message" ? "Suspicious Message" : "Unknown URL",

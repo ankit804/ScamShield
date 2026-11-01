@@ -9,17 +9,10 @@ import { analyzeSubmission } from '../../utils/analysisEngine';
 import { Image, MessageSquare, Link as LinkIcon, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AnalyzePage() {
-  const { t, language, setLanguage, addScanResult, showToast } = useApp();
+  const { t, language, setLanguage, addScanResult, showToast, analyzeMode, setAnalyzeMode } = useApp();
   const { token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const preferred = sessionStorage.getItem('preferred_tab');
-    if (preferred) {
-      sessionStorage.removeItem('preferred_tab');
-      return preferred;
-    }
-    return 'screenshot';
-  });
+  const activeTab = analyzeMode;
 
   const [screenshotData, setScreenshotData] = useState({ fileName: '', fileSize: 0 });
   const [messageText, setMessageText] = useState('');
@@ -41,9 +34,9 @@ export default function AnalyzePage() {
         presetType: 'custom-upload',
         caption: `Uploaded image ${pendingName}`
       });
-      setActiveTab('screenshot');
+      setAnalyzeMode('screenshot');
     }
-  }, []);
+  }, [setAnalyzeMode]);
 
   const handleStartAnalysis = async () => {
     setValidationError('');
@@ -108,7 +101,7 @@ export default function AnalyzePage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
           <button
             type="button"
-            onClick={() => setActiveTab('screenshot')}
+            onClick={() => setAnalyzeMode('screenshot')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'screenshot'
                 ? 'bg-slate-900 text-white shadow-sm'
@@ -121,7 +114,7 @@ export default function AnalyzePage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('message')}
+            onClick={() => setAnalyzeMode('message')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'message'
                 ? 'bg-slate-900 text-white shadow-sm'
@@ -134,7 +127,7 @@ export default function AnalyzePage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab('url')}
+            onClick={() => setAnalyzeMode('url')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'url'
                 ? 'bg-slate-900 text-white shadow-sm'

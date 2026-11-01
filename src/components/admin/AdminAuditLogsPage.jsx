@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/apiClient';
 import { ClipboardList, Loader2, RefreshCw } from 'lucide-react';
 
 const actionStyle = (action) => action?.includes('SUSPENDED') ? 'bg-red-50 text-red-700' : action?.includes('ACTIVATED') ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700';
@@ -12,7 +13,7 @@ export default function AdminAuditLogsPage() {
   const fetchLogs = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const response = await fetch(`${apiBase}/admin/audit-logs`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiFetch(`${apiBase}/admin/audit-logs`, { token });
       if (!response.ok) throw new Error((await response.json()).detail || 'Could not load audit history.');
       const data = await response.json();
       setLogs(Array.isArray(data) ? data : []);

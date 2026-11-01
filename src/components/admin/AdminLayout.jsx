@@ -17,7 +17,7 @@ export default function AdminLayout({ activeTab, onSelectTab, children }) {
   const navigate = (tab) => { onSelectTab(tab); setMobileOpen(false); };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] lg:flex">
+    <div className="app-shell app-admin min-h-screen lg:flex">
       {mobileOpen && <button aria-label="Close admin menu" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" />}
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#142D4E] text-white transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">

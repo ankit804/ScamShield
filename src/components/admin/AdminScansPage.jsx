@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/apiClient';
 import { 
   ScanSearch, 
   FileImage, 
@@ -37,9 +38,7 @@ export default function AdminScansPage() {
       if (typeFilter !== 'all') params.append('type', typeFilter);
       if (riskFilter !== 'all') params.append('risk', riskFilter);
 
-      const res = await fetch(`${apiBase}/admin/scans?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch(`${apiBase}/admin/scans?${params.toString()}`, { token });
 
       if (res.ok) {
         const data = await res.json();

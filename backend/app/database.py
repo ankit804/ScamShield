@@ -1,5 +1,6 @@
+from pathlib import Path
 from sqlalchemy import create_engine, event
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from .config import settings
 
@@ -7,6 +8,8 @@ from .config import settings
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+    if settings.DATABASE_URL.startswith("sqlite:///./"):
+        Path(settings.DATABASE_URL.removeprefix("sqlite:///./")).parent.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(
     settings.DATABASE_URL,
@@ -30,5 +33,8 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

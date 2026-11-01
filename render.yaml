@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: scamshield-api
+    runtime: docker
+    plan: starter
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    healthCheckPath: /health
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scamshield-postgres
+          property: connectionString
+      - key: FRONTEND_ORIGIN
+        value: https://scamshield-nepal.vercel.app
+      - key: CORS_ORIGINS
+        value: https://scamshield-nepal.vercel.app
+      - key: SCAN_RETENTION_DAYS
+        value: "90"
+      - key: OCR_LANGUAGES
+        value: eng
+
+databases:
+  - name: scamshield-postgres
+    databaseName: scamshield
+    user: scamshield

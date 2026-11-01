@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/apiClient';
 import { useApp } from '../../context/AppContext';
 import { 
   Users, 
@@ -41,9 +42,7 @@ export default function AdminUsersPage() {
       if (roleFilter !== 'all') params.append('role', roleFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
 
-      const res = await fetch(`${apiBase}/admin/users?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch(`${apiBase}/admin/users?${params.toString()}`, { token });
 
       if (res.ok) {
         const data = await res.json();
@@ -74,12 +73,10 @@ export default function AdminUsersPage() {
     const newStatus = modalAction === 'suspend' ? 'suspended' : 'active';
 
     try {
-      const res = await fetch(`${apiBase}/admin/users/${modalUser.id}/status`, {
+      const res = await apiFetch(`${apiBase}/admin/users/${modalUser.id}/status`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
+        token,
         body: JSON.stringify({ status: newStatus })
       });
 

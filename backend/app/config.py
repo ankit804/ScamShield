@@ -1,5 +1,11 @@
 import os
+from pathlib import Path
 from typing import List, Optional
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+except ImportError:
+    pass
 
 MIN_SECRET_KEY_LENGTH = 32
 PRODUCTION_ENVIRONMENTS = {"production", "prod"}
@@ -60,18 +66,33 @@ class Settings:
     def __init__(self) -> None:
         self.SECRET_KEY: str = load_secret_key()
         self.ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+        if self.ACCESS_TOKEN_EXPIRE_MINUTES < 1:
+            raise RuntimeError("ACCESS_TOKEN_EXPIRE_MINUTES must be a positive integer.")
         self.DATABASE_URL: str = normalize_database_url(
             os.getenv("DATABASE_URL", "sqlite:///./scamshield.db")
         )
         self.ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+        if is_production(self.ENVIRONMENT) and not self.DATABASE_URL.startswith(("postgresql://", "postgresql+")):
+            raise RuntimeError("Production requires DATABASE_URL to point to PostgreSQL.")
         self.CORS_ORIGINS: List[str] = parse_cors_origins(
-            [
+            [] if is_production(self.ENVIRONMENT) else [
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
                 "http://localhost:3000",
                 "https://scamshield-nepal.vercel.app",
             ]
         )
+        if is_production(self.ENVIRONMENT) and not self.CORS_ORIGINS:
+            raise RuntimeError("Configure at least one allowed CORS origin in production.")
+        if is_production(self.ENVIRONMENT) and any(not origin.startswith("https://") for origin in self.CORS_ORIGINS):
+            raise RuntimeError("Production CORS origins must use HTTPS.")
+        self.RESET_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "15"))
+        if self.RESET_TOKEN_EXPIRE_MINUTES < 1 or self.RESET_TOKEN_EXPIRE_MINUTES > 60:
+            raise RuntimeError("RESET_TOKEN_EXPIRE_MINUTES must be between 1 and 60.")
+        self.OCR_LANGUAGES: str = os.getenv("OCR_LANGUAGES", "eng")
+        self.SCAN_RETENTION_DAYS: int = int(os.getenv("SCAN_RETENTION_DAYS", "90"))
+        if self.SCAN_RETENTION_DAYS < 1 or self.SCAN_RETENTION_DAYS > 3650:
+            raise RuntimeError("SCAN_RETENTION_DAYS must be between 1 and 3650.")
 
 
 settings = Settings()

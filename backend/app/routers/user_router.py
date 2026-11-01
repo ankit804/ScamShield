@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Scan
-from ..schemas import UserResponse, ScanCreate, ScanResponse, UserStats
+from ..schemas import UserResponse, UserProfileUpdate, ScanResponse, UserStats
 from ..auth import get_current_user
 
 # Initialize router instance
@@ -14,6 +13,18 @@ router = APIRouter(prefix="/users/me", tags=["User Dashboard"])
 @router.get("", response_model=UserResponse)
 def get_user_profile(current_user: User = Depends(get_current_user)):
     """Fetch current user profile"""
+    return current_user
+
+
+@router.patch("", response_model=UserResponse)
+def update_user_profile(
+    profile: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.full_name = profile.full_name
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
@@ -41,18 +52,24 @@ def get_user_stats(
 
 @router.get("/scans", response_model=List[ScanResponse])
 def get_user_scans(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=1000000),
+    risk: Optional[str] = Query(None, pattern="^(high|review|safe)$"),
+    type_filter: Optional[str] = Query(None, alias="type", pattern="^(screenshot|message|url)$"),
+    sort: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Fetch scan history strictly belonging to the authenticated user.
     """
-    scans = (
-        db.query(Scan)
-        .filter(Scan.user_id == current_user.id)
-        .order_by(Scan.created_at.desc())
-        .all()
-    )
+    query = db.query(Scan).filter(Scan.user_id == current_user.id)
+    if risk:
+        query = query.filter(Scan.risk_category == risk)
+    if type_filter:
+        query = query.filter(Scan.type == type_filter)
+    order = Scan.created_at.asc() if sort == "asc" else Scan.created_at.desc()
+    scans = query.order_by(order).offset(offset).limit(limit).all()
 
     results = []
     for s in scans:
@@ -89,63 +106,47 @@ def get_user_scans(
     return results
 
 
-@router.post("/scans", response_model=ScanResponse, status_code=status.HTTP_201_CREATED)
-def create_user_scan(
-    scan_in: ScanCreate,
+@router.get("/scans/{scan_id}", response_model=ScanResponse)
+def get_user_scan(
+    scan_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Record a new verified scan associated exclusively with the authenticated user.
-    """
-    scan_id = scan_in.id or f"scan-{int(datetime.now().timestamp() * 1000)}"
-
-    new_scan = Scan(
-        id=scan_id,
-        user_id=current_user.id,
-        type=scan_in.type,
-        type_label=scan_in.type_label,
-        submitted_item=scan_in.submitted_item,
-        risk_category=scan_in.risk_category,
-        risk_label=scan_in.risk_label,
-        status=scan_in.status,
-        evidence_found=scan_in.evidence_found,
-        total_indicators=scan_in.total_indicators,
-        summary=scan_in.summary,
-        findings_json=json.dumps(scan_in.findings),
-        next_steps_json=json.dumps(scan_in.next_steps),
-        disclaimer=scan_in.disclaimer
-    )
-
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == current_user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan record not found.")
     try:
-        db.add(new_scan)
-        db.commit()
-        db.refresh(new_scan)
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save scan record to database."
-        )
-
+        findings = json.loads(scan.findings_json)
+    except (TypeError, ValueError):
+        findings = []
+    try:
+        next_steps = json.loads(scan.next_steps_json)
+    except (TypeError, ValueError):
+        next_steps = []
     return {
-        "id": new_scan.id,
-        "user_id": new_scan.user_id,
-        "type": new_scan.type,
-        "type_label": new_scan.type_label,
-        "submitted_item": new_scan.submitted_item,
-        "risk_category": new_scan.risk_category,
-        "risk_label": new_scan.risk_label,
-        "status": new_scan.status,
-        "evidence_found": new_scan.evidence_found,
-        "total_indicators": new_scan.total_indicators,
-        "summary": new_scan.summary,
-        "findings": scan_in.findings,
-        "next_steps": scan_in.next_steps,
-        "disclaimer": new_scan.disclaimer,
-        "created_at": new_scan.created_at,
-        "dateFormatted": new_scan.created_at.strftime("%b %d, %Y %H:%M")
+        "id": scan.id, "user_id": scan.user_id, "type": scan.type,
+        "type_label": scan.type_label, "submitted_item": scan.submitted_item,
+        "risk_category": scan.risk_category, "risk_label": scan.risk_label,
+        "status": scan.status, "evidence_found": scan.evidence_found,
+        "total_indicators": scan.total_indicators, "summary": scan.summary,
+        "findings": findings, "next_steps": next_steps,
+        "disclaimer": scan.disclaimer, "created_at": scan.created_at,
+        "dateFormatted": scan.created_at.strftime("%b %d, %Y %H:%M") if scan.created_at else "",
     }
+
+
+@router.delete("/scans")
+def clear_user_scans(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        deleted = db.query(Scan).filter(Scan.user_id == current_user.id).delete(synchronize_session=False)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Could not clear scan history.") from exc
+    return {"message": "Scan history cleared.", "deleted_count": deleted}
 
 
 @router.delete("/scans/{scan_id}")
@@ -157,18 +158,11 @@ def delete_user_scan(
     """
     Delete a scan record, strictly verifying user ownership to prevent IDOR attacks.
     """
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == current_user.id).first()
     if not scan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Scan record not found."
-        )
-
-    # Enforce strict ownership check
-    if scan.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete this scan record."
         )
 
     try:

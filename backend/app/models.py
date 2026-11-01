@@ -1,10 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, CheckConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'admin')", name="ck_users_role"),
+        CheckConstraint("status IN ('active', 'suspended')", name="ck_users_status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String(100), nullable=False)
@@ -15,7 +19,9 @@ class User(Base):
     
     # Password reset support
     reset_token = Column(String(255), nullable=True)
+    reset_token_hash = Column(String(64), nullable=True, unique=True, index=True)
     reset_token_expires_at = Column(DateTime, nullable=True)
+    token_version = Column(Integer, default=0, server_default="0", nullable=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
@@ -26,6 +32,11 @@ class User(Base):
 
 class Scan(Base):
     __tablename__ = "scans"
+    __table_args__ = (
+        CheckConstraint("type IN ('screenshot', 'message', 'url')", name="ck_scans_type"),
+        CheckConstraint("risk_category IN ('high', 'review', 'safe')", name="ck_scans_risk_category"),
+        Index("ix_scans_user_created", "user_id", "created_at"),
+    )
 
     id = Column(String(50), primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -59,3 +70,12 @@ class AuditLog(Base):
     details = Column(Text, nullable=True)
     ip_address = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AuthAttempt(Base):
+    """Short-lived hashed rate-limit keys; never stores submitted credentials."""
+    __tablename__ = "auth_attempts"
+
+    id = Column(Integer, primary_key=True)
+    key_hash = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

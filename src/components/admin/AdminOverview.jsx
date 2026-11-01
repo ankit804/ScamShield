@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/apiClient';
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, ScanSearch, Users, UserCheck } from 'lucide-react';
 
 const metrics = [
@@ -16,7 +17,7 @@ export default function AdminOverview({ onNavigate }) {
   const fetchStats = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const response = await fetch(`${apiBase}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiFetch(`${apiBase}/admin/stats`, { token });
       if (!response.ok) throw new Error((await response.json()).detail || 'Could not load platform statistics.');
       setStats(await response.json());
     } catch (err) { setError(err.message || 'Could not connect to the server.'); }

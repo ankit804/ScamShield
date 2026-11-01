@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export default function QuickScanCard({ onSelectMode }) {
-  const { setCurrentView, t } = useApp();
+  const { setCurrentView, setAnalyzeMode, t } = useApp();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -99,7 +99,7 @@ export default function QuickScanCard({ onSelectMode }) {
           <button
             type="button"
             onClick={() => {
-              sessionStorage.setItem('preferred_tab', 'message');
+              setAnalyzeMode('message');
               setCurrentView('analyze');
             }}
             className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-xs font-semibold text-slate-700 transition-all"
@@ -110,7 +110,7 @@ export default function QuickScanCard({ onSelectMode }) {
           <button
             type="button"
             onClick={() => {
-              sessionStorage.setItem('preferred_tab', 'url');
+              setAnalyzeMode('url');
               setCurrentView('analyze');
             }}
             className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-xs font-semibold text-slate-700 transition-all"
