@@ -39,7 +39,11 @@ def should_disclose_reset_token(environment: Optional[str] = None) -> bool:
 
 def normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://") :]
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        # The backend installs psycopg2-binary, so select that SQLAlchemy driver
+        # explicitly instead of SQLAlchemy's default psycopg 3 driver.
+        return "postgresql+psycopg2://" + url[len("postgresql://") :]
     return url
 
 
