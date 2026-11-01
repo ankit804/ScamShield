@@ -2,12 +2,11 @@ services:
   - type: web
     name: scamshield-api
     runtime: docker
-    plan: starter
+    plan: free
     rootDir: backend
     dockerfilePath: ./Dockerfile
     dockerContext: ./
     healthCheckPath: /health
-    preDeployCommand: alembic upgrade head
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -28,5 +27,6 @@ services:
 
 databases:
   - name: scamshield-postgres
+    plan: free
     databaseName: scamshield
     user: scamshield
